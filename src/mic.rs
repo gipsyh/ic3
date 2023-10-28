@@ -1,7 +1,10 @@
 use super::{solver::BlockResult, Ic3};
 use crate::solver::BlockResultNo;
 use logic_form::{Cube, Lit};
-use std::{collections::HashSet, time::Instant};
+use std::{
+    collections::{HashSet, VecDeque},
+    time::Instant,
+};
 #[derive(Debug)]
 enum DownResult {
     Success(Cube),
@@ -126,6 +129,94 @@ impl Ic3 {
             }
             parent
         });
+        let mut parent = self.frames.parent(&cube, frame);
+        self.statistic
+            .test_parent_found
+            .statistic(!parent.is_empty());
+        if !parent.is_empty() {
+            let mut ordered_cube = cube.clone();
+            ordered_cube.sort();
+            for p in parent.iter() {
+                if p.eq(&ordered_cube) {
+                    self.statistic.test_eq_parent.success();
+                    return cube;
+                }
+            }
+            self.statistic.test_eq_parent.fail();
+            parent.retain(|p| self.push_fail.contains_key(&(p.clone(), frame - 1)));
+
+            self.statistic
+                .test_push_fail_found
+                .statistic(!parent.is_empty());
+
+            for p in parent {
+                let cex = self.push_fail.get(&(p.clone(), frame - 1)).unwrap();
+                let mut same = Cube::new();
+                let mut diff = Cube::new();
+                for l in cube.iter() {
+                    if cex.binary_search(l).is_ok() {
+                        same.push(*l);
+                    } else {
+                        diff.push(*l);
+                    }
+                }
+                self.activity.sort_by_activity(&mut diff, false);
+                // println!("cube {:?}", cube);
+                // println!("parent {:?}", p);
+                // println!("same {:?}", same);
+                // println!("diff {:?}", diff);
+                let keep = HashSet::from_iter(p.iter().copied());
+                self.statistic.test_diff_empty.statistic(diff.is_empty());
+                if !diff.is_empty() {
+                    let mut diff = VecDeque::from_iter(diff);
+                    while let Some(d) = diff.pop_front() {
+                        let mut pp = p.clone();
+                        pp.push(d);
+                        // println!("try {:?}", pp);
+                        let time = Instant::now();
+                        let res = if simple {
+                            self.down(frame, &pp)
+                        } else {
+                            self.ctg_down(frame, &pp, &keep)
+                        };
+                        match res {
+                            DownResult::Success(res) => {
+                                // dbg!("success");
+                                self.statistic.test_down_diff.success();
+                                return res;
+                            }
+                            DownResult::Fail(cex) => {
+                                self.statistic.test_down_diff.fail();
+                                // let mut cc = Vec::new();
+                                // for dd in diff.iter() {
+                                //     let pdd = self.share.model.lit_next(*dd);
+                                //     cc.push(self.unblocked_model_lit_value(&cex, pdd));
+                                // }
+                                // println!("cc {:?}", cc);
+                                while let Some(df) = diff.front() {
+                                    let pdf = self.share.model.lit_next(*df);
+                                    if self.unblocked_model_lit_value(&cex, pdf) {
+                                        diff.pop_front();
+                                    } else {
+                                        break;
+                                    }
+                                }
+                            }
+                            DownResult::IncludeInit => (),
+                        }
+                        self.statistic.test_fail_time += time.elapsed();
+                        // dbg!("try fail");
+                    }
+                    // dbg!("fail");
+                } else {
+                    if let DownResult::Success(res) = self.down(frame, &p) {
+                        self.statistic.test_down_parent.success();
+                        return res;
+                    }
+                    self.statistic.test_down_parent.fail();
+                }
+            }
+        }
         let mut i = 0;
         while i < cube.len() {
             let mut removed_cube = cube.clone();

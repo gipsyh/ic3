@@ -25,6 +25,14 @@ pub struct Statistic {
 
     pub overall_block_time: Duration,
     pub overall_propagate_time: Duration,
+
+    pub test_fail_time: Duration,
+    pub test_parent_found: SuccessRate,
+    pub test_eq_parent: SuccessRate,
+    pub test_push_fail_found: SuccessRate,
+    pub test_diff_empty: SuccessRate,
+    pub test_down_diff: SuccessRate,
+    pub test_down_parent: SuccessRate,
 }
 
 impl Statistic {

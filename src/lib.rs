@@ -23,6 +23,7 @@ use frames::Frames;
 use logic_form::{Cube, Lit};
 use model::Model;
 use solver::{BlockResult, Ic3Solver};
+use std::collections::HashMap;
 use std::panic::{self, AssertUnwindSafe};
 use std::process::exit;
 use std::{sync::Arc, time::Instant};
@@ -36,6 +37,7 @@ pub struct Ic3 {
     pub obligations: ProofObligationQueue,
     pub lift: Lift,
     pub statistic: Statistic,
+    pub push_fail: HashMap<(Cube, usize), Cube>,
 }
 
 impl Ic3 {
@@ -54,7 +56,21 @@ impl Ic3 {
         for i in frame + 1..=self.depth() {
             match self.blocked(i, &cube) {
                 BlockResult::Yes(block) => cube = self.blocked_conflict(&block),
-                BlockResult::No(_) => return (i, cube),
+                BlockResult::No(unblock) => {
+                    let mut cex = Cube::new();
+                    for p in self.share.model.primes.iter() {
+                        cex.push(Lit::new(
+                            *p,
+                            self.unblocked_model_lit_value(&unblock, p.lit()),
+                        ));
+                    }
+                    let mut tmp = cube.clone();
+                    tmp.sort();
+                    let cex = self.share.model.cube_previous(&cex);
+                    debug_assert!(tmp.ordered_subsume(&cex));
+                    self.push_fail.insert((tmp, i - 1), cex);
+                    return (i, cube);
+                }
             }
         }
         (self.depth() + 1, cube)
@@ -108,6 +124,7 @@ impl Ic3 {
     }
 
     pub fn propagate(&mut self, trivial: bool) -> bool {
+        self.push_fail.clear();
         let start = if trivial {
             (self.depth() - 1).max(1)
         } else {
@@ -128,7 +145,18 @@ impl Ic3 {
                             self.cav23_activity.pump_cube_activity(&cube);
                         }
                     }
-                    BlockResult::No(_) => {}
+                    BlockResult::No(unblock) => {
+                        let mut cex = Cube::new();
+                        for p in self.share.model.primes.iter() {
+                            cex.push(Lit::new(
+                                *p,
+                                self.unblocked_model_lit_value(&unblock, p.lit()),
+                            ));
+                        }
+                        let cex = self.share.model.cube_previous(&cex);
+                        debug_assert!(cube.ordered_subsume(&cex));
+                        self.push_fail.insert((cube.clone(), frame_idx), cex);
+                    }
                 }
             }
             self.solvers[frame_idx + 1].simplify();
@@ -165,6 +193,7 @@ impl Ic3 {
             statistic: Statistic::new(share.args.model.as_ref().unwrap()),
             share,
             obligations: ProofObligationQueue::new(),
+            push_fail: HashMap::new(),
         };
         res.new_frame();
         for i in 0..res.share.aig.latchs.len() {
