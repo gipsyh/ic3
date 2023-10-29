@@ -185,23 +185,21 @@ impl Ic3 {
                                 self.statistic.test_down_diff.success();
                                 return res;
                             }
-                            DownResult::Fail(_) => {
+                            DownResult::Fail(unblock) => {
+                                // dbg!("fail");
                                 self.statistic.test_down_diff.fail();
-                                // while let Some(df) = diff.front() {
-                                //     let pdf = self.share.model.lit_next(*df);
-                                //     if self.unblocked_model_lit_value(&cex, pdf) {
-                                //         diff.pop_front();
-                                //     } else {
-                                //         break;
-                                //     }
-                                // }
+                                if simple {
+                                    diff.retain(|l| {
+                                        let pl = self.share.model.lit_next(*l);
+                                        !self.unblocked_model_lit_value(&unblock, pl)
+                                    });
+                                }
                             }
                             DownResult::IncludeInit => (),
                         }
                         self.statistic.test_fail_time += time.elapsed();
                         // dbg!("try fail");
                     }
-                    // dbg!("fail");
                 } else {
                     if let DownResult::Success(res) = self.down(frame, &p) {
                         self.statistic.test_down_parent.success();
