@@ -33,8 +33,6 @@ pub struct Statistic {
     pub test_diff_empty: SuccessRate,
     pub test_down_diff: SuccessRate,
     pub test_down_parent: SuccessRate,
-    
-    pub test_p_all_true: SuccessRate,
 }
 
 impl Statistic {

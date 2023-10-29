@@ -73,6 +73,69 @@ impl Ic3 {
         }
     }
 
+    fn ctg_down_test(
+        &mut self,
+        frame: usize,
+        cube: &Cube,
+        keep: &HashSet<Lit>,
+        diff: &mut VecDeque<Lit>,
+    ) -> DownResult {
+        let mut cube = cube.clone();
+        self.statistic.num_ctg_down += 1;
+        let mut ctgs = 0;
+        let mut first = true;
+        loop {
+            if self.share.model.cube_subsume_init(&cube) {
+                return DownResult::IncludeInit;
+            }
+            match self.blocked(frame, &cube) {
+                BlockResult::Yes(blocked) => {
+                    return DownResult::Success(self.blocked_conflict(&blocked))
+                }
+                BlockResult::No(unblocked) => {
+                    let mut model = self.unblocked_model(&unblocked);
+                    if first {
+                        diff.retain(|l| {
+                            let pl = self.share.model.lit_next(*l);
+                            !self.unblocked_model_lit_value(&unblocked, pl)
+                        });
+                        first = false;
+                    }
+                    if ctgs < 3 && frame > 1 && !self.share.model.cube_subsume_init(&model) {
+                        if self.share.args.cav23 {
+                            self.cav23_activity.sort_by_activity(&mut model, false);
+                        }
+                        if let BlockResult::Yes(blocked) = self.blocked(frame - 1, &model) {
+                            ctgs += 1;
+                            let conflict = self.blocked_conflict(&blocked);
+                            let mut i = frame;
+                            while i <= self.depth() {
+                                if let BlockResult::No(_) = self.blocked(i, &conflict) {
+                                    break;
+                                }
+                                i += 1;
+                            }
+                            let conflict = self.mic(i - 1, conflict, true);
+                            self.add_cube(i - 1, conflict);
+                            continue;
+                        }
+                    }
+                    ctgs = 0;
+                    let cex_set: HashSet<Lit> = HashSet::from_iter(model);
+                    let mut cube_new = Cube::new();
+                    for lit in cube {
+                        if cex_set.contains(&lit) {
+                            cube_new.push(lit);
+                        } else if keep.contains(&lit) {
+                            return DownResult::Fail(unblocked);
+                        }
+                    }
+                    cube = cube_new;
+                }
+            }
+        }
+    }
+
     fn add_temporary_cube(&mut self, mut frame: usize, cube: &Cube) {
         frame = frame.min(self.depth());
         for solver in self.solvers[1..=frame].iter_mut() {
@@ -177,7 +240,7 @@ impl Ic3 {
                         let res = if simple {
                             self.down(frame, &pp)
                         } else {
-                            self.ctg_down(frame, &pp, &keep)
+                            self.ctg_down_test(frame, &pp, &keep, &mut diff)
                         };
                         match res {
                             DownResult::Success(res) => {
