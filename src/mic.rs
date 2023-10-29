@@ -185,22 +185,16 @@ impl Ic3 {
                                 self.statistic.test_down_diff.success();
                                 return res;
                             }
-                            DownResult::Fail(cex) => {
+                            DownResult::Fail(_) => {
                                 self.statistic.test_down_diff.fail();
-                                // let mut cc = Vec::new();
-                                // for dd in diff.iter() {
-                                //     let pdd = self.share.model.lit_next(*dd);
-                                //     cc.push(self.unblocked_model_lit_value(&cex, pdd));
+                                // while let Some(df) = diff.front() {
+                                //     let pdf = self.share.model.lit_next(*df);
+                                //     if self.unblocked_model_lit_value(&cex, pdf) {
+                                //         diff.pop_front();
+                                //     } else {
+                                //         break;
+                                //     }
                                 // }
-                                // println!("cc {:?}", cc);
-                                while let Some(df) = diff.front() {
-                                    let pdf = self.share.model.lit_next(*df);
-                                    if self.unblocked_model_lit_value(&cex, pdf) {
-                                        diff.pop_front();
-                                    } else {
-                                        break;
-                                    }
-                                }
                             }
                             DownResult::IncludeInit => (),
                         }
