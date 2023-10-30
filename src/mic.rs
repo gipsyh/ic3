@@ -264,9 +264,23 @@ impl Ic3 {
                         // dbg!("try fail");
                     }
                 } else {
-                    if let DownResult::Success(res) = self.down(frame, &p) {
-                        self.statistic.test_down_parent.success();
-                        return res;
+                    match self.down(frame, &p) {
+                        DownResult::Success(res) => {
+                            self.statistic.test_down_parent.success();
+                            return res;
+                        }
+                        DownResult::Fail(unblock) => {
+                            let mut cex = Cube::new();
+                            for p in self.share.model.primes.iter() {
+                                cex.push(Lit::new(
+                                    *p,
+                                    self.unblocked_model_lit_value(&unblock, p.lit()),
+                                ));
+                            }
+                            let cex = self.share.model.cube_previous(&cex);
+                            self.push_fail.insert((p.clone(), frame - 1), cex);
+                        }
+                        DownResult::IncludeInit => (),
                     }
                     self.statistic.test_down_parent.fail();
                 }
