@@ -83,7 +83,8 @@ impl Ic3 {
         let mut cube = cube.clone();
         self.statistic.num_ctg_down += 1;
         let mut ctgs = 0;
-        let mut first = true;
+        let mut changed = false;
+        let diff_clone = diff.clone();
         loop {
             if self.share.model.cube_subsume_init(&cube) {
                 return DownResult::IncludeInit;
@@ -94,12 +95,12 @@ impl Ic3 {
                 }
                 BlockResult::No(unblocked) => {
                     let mut model = self.unblocked_model(&unblocked);
-                    if first {
+                    if !changed {
+                        *diff = diff_clone.clone();
                         diff.retain(|l| {
                             let pl = self.share.model.lit_next(*l);
                             !self.unblocked_model_lit_value(&unblocked, pl)
                         });
-                        first = false;
                     }
                     if ctgs < 3 && frame > 1 && !self.share.model.cube_subsume_init(&model) {
                         if self.share.args.cav23 {
@@ -120,6 +121,7 @@ impl Ic3 {
                             continue;
                         }
                     }
+                    changed = true;
                     ctgs = 0;
                     let cex_set: HashSet<Lit> = HashSet::from_iter(model);
                     let mut cube_new = Cube::new();
