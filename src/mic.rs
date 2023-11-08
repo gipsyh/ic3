@@ -204,6 +204,7 @@ impl Ic3 {
             for p in parent.iter() {
                 if p.eq(&ordered_cube) {
                     self.statistic.test_eq_parent.success();
+                    self.statistic.srp.success();
                     return cube;
                 }
             }
@@ -248,6 +249,7 @@ impl Ic3 {
                             DownResult::Success(res) => {
                                 // dbg!("success");
                                 self.statistic.test_down_diff.success();
+                                self.statistic.srp.success();
                                 return res;
                             }
                             DownResult::Fail(unblock) => {
@@ -269,6 +271,7 @@ impl Ic3 {
                     match self.down(frame, &p) {
                         DownResult::Success(res) => {
                             self.statistic.test_down_parent.success();
+                            self.statistic.srp.success();
                             return res;
                         }
                         DownResult::Fail(unblock) => {
@@ -288,6 +291,7 @@ impl Ic3 {
                 }
             }
         }
+        self.statistic.srp.fail();
         let mut i = 0;
         while i < cube.len() {
             let mut removed_cube = cube.clone();
