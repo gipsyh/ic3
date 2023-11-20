@@ -204,7 +204,7 @@ impl Ic3 {
             for p in parent.iter() {
                 if p.eq(&ordered_cube) {
                     self.statistic.test_eq_parent.success();
-                    self.statistic.srp.success();
+                    self.statistic.sr_adv.success();
                     return cube;
                 }
             }
@@ -214,6 +214,8 @@ impl Ic3 {
             self.statistic
                 .test_push_fail_found
                 .statistic(!parent.is_empty());
+
+            self.statistic.sr_fp.statistic(!parent.is_empty());
 
             for p in parent {
                 let cex = self.push_fail.get(&(p.clone(), frame - 1)).unwrap();
@@ -248,11 +250,13 @@ impl Ic3 {
                         match res {
                             DownResult::Success(res) => {
                                 // dbg!("success");
+                                self.statistic.sr_lp.success();
                                 self.statistic.test_down_diff.success();
-                                self.statistic.srp.success();
+                                self.statistic.sr_adv.success();
                                 return res;
                             }
                             DownResult::Fail(unblock) => {
+                                self.statistic.sr_lp.fail();
                                 // dbg!("fail");
                                 self.statistic.test_down_diff.fail();
                                 if simple {
@@ -271,10 +275,12 @@ impl Ic3 {
                     match self.down(frame, &p) {
                         DownResult::Success(res) => {
                             self.statistic.test_down_parent.success();
-                            self.statistic.srp.success();
+                            self.statistic.sr_lp.success();
+                            self.statistic.sr_adv.success();
                             return res;
                         }
                         DownResult::Fail(unblock) => {
+                            self.statistic.sr_lp.fail();
                             let mut cex = Cube::new();
                             for p in self.share.model.primes.iter() {
                                 cex.push(Lit::new(
@@ -290,8 +296,10 @@ impl Ic3 {
                     self.statistic.test_down_parent.fail();
                 }
             }
+        } else {
+            self.statistic.sr_fp.fail();
         }
-        self.statistic.srp.fail();
+        self.statistic.sr_adv.fail();
         let mut i = 0;
         while i < cube.len() {
             let mut removed_cube = cube.clone();
