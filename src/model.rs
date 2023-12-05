@@ -1,4 +1,4 @@
-use aig::Aig;
+use aig::{Aig, AigEdge};
 use logic_form::{Clause, Cnf, Cube, Lit, Var};
 use minisat::{SimpSolver, Solver};
 use std::collections::HashMap;
@@ -47,6 +47,7 @@ impl Model {
         simp_solver.set_frozen(bad.var(), true);
         let mut logic = Vec::new();
         for l in aig.latchs.iter() {
+            logic.push(l.input.into());
             logic.push(l.next);
         }
         for c in aig.constraints.iter() {

@@ -29,6 +29,10 @@ pub struct Args {
     /// save frames
     #[arg(long, default_value_t = false)]
     pub save_frames: bool,
+
+    /// test
+    #[arg(long, default_value_t = false)]
+    pub test: bool,
 }
 
 impl Default for Args {

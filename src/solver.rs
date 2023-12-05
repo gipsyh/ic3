@@ -280,6 +280,10 @@ impl Ic3 {
             }
         };
         self.lift.solver.release_var(!act);
+        if res.len() > 0 {
+            let v: usize = res[0].var().into();
+            self.statistic.test_succ.statistic(v > self.origin);
+        }
         res
     }
 }

@@ -5,6 +5,7 @@ mod activity;
 mod analysis;
 mod basic;
 mod command;
+mod da;
 mod frames;
 mod mic;
 mod model;
@@ -19,10 +20,12 @@ use crate::{basic::ProofObligationQueue, solver::Lift};
 use activity::Activity;
 use aig::Aig;
 pub use command::Args;
+use da::da_aig;
 use frames::Frames;
 use logic_form::{Cube, Lit};
 use model::Model;
 use solver::{BlockResult, Ic3Solver};
+use std::collections::{HashMap, HashSet};
 use std::panic::{self, AssertUnwindSafe};
 use std::process::exit;
 use std::{sync::Arc, time::Instant};
@@ -35,6 +38,8 @@ pub struct Ic3 {
     pub obligations: ProofObligationQueue,
     pub lift: Lift,
     pub statistic: Statistic,
+    pub testda: HashMap<Cube, HashSet<Lit>>,
+    origin: usize,
 }
 
 impl Ic3 {
@@ -138,7 +143,17 @@ impl Ic3 {
 
 impl Ic3 {
     pub fn new(args: Args) -> Self {
-        let aig = Aig::from_file(args.model.as_ref().unwrap()).unwrap();
+        let mut aig = Aig::from_file(args.model.as_ref().unwrap()).unwrap();
+        let mut activity = Activity::new();
+        let origin = aig.latchs.iter().max_by_key(|l|l.input).unwrap().input;
+        dbg!(aig.latchs.len());
+        dbg!(aig.nodes.len());
+        if args.test {
+            aig = da_aig(aig, &mut activity);
+        }
+        dbg!(aig.latchs.len());
+        dbg!(aig.nodes.len());
+
         let model = Model::from_aig(&aig);
         let bad = Cube::from([if aig.bads.is_empty() {
             aig.outputs[0]
@@ -155,11 +170,13 @@ impl Ic3 {
         let mut res = Self {
             solvers: Vec::new(),
             frames: Frames::new(),
-            activity: Activity::new(),
+            activity,
             lift: Lift::new(share.clone()),
             statistic: Statistic::new(share.args.model.as_ref().unwrap()),
             share,
             obligations: ProofObligationQueue::new(),
+            testda: HashMap::new(),
+            origin,
         };
         res.new_frame();
         for i in 0..res.share.aig.latchs.len() {
@@ -205,6 +222,9 @@ impl Ic3 {
                 }
                 if self.share.args.verify {
                     assert!(self.verify());
+                }
+                if !self.share.args.test {
+                    self.save_da();
                 }
                 return true;
             }

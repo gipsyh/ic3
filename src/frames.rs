@@ -3,6 +3,7 @@ use logic_form::Cube;
 use minisat::SatResult;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashSet,
     fmt::{self, Debug, Display},
     mem::take,
     ops::{Deref, DerefMut},
@@ -81,6 +82,14 @@ impl Ic3 {
             }
         }
         let clause = !&cube;
+        if cube.len() > 1 {
+            for i in 0..cube.len() {
+                let mut c = cube.clone();
+                c.remove(i);
+                let entry = self.testda.entry(c).or_insert(HashSet::default());
+                entry.insert(cube[i]);
+            }
+        }
         self.frames[frame].push(cube);
         for i in begin..=frame {
             self.solvers[i].add_clause(&clause);

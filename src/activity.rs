@@ -33,6 +33,15 @@ impl Activity {
         }
     }
 
+    pub fn pump_lit_activity_test(&mut self, lit: &Lit) {
+        match self.activity.get_mut(&lit.var()) {
+            Some(a) => *a += 100000.0,
+            None => {
+                self.activity.insert(lit.var(), 100000.0);
+            }
+        }
+    }
+
     pub fn pump_cube_activity(&mut self, cube: &Cube) {
         self.decay();
         cube.iter().for_each(|l| self.pump_lit_activity(l));

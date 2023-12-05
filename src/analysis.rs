@@ -13,7 +13,7 @@ impl Ic3 {
 }
 
 fn read_frames() -> Frames {
-    let mut file = File::open("frames.json").expect("Failed to open file");
+    let mut file = File::open("frames.json").unwrap();
     let mut json = String::new();
     file.read_to_string(&mut json).unwrap();
     serde_json::from_str(&json).unwrap()

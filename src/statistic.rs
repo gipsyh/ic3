@@ -21,9 +21,11 @@ pub struct Statistic {
     pub average_mic_cube_len: StatisticAverage,
     pub mic_drop: SuccessRate,
     pub num_ctg_down: usize,
-
+    
     pub overall_block_time: Duration,
     pub overall_propagate_time: Duration,
+    
+    pub test_succ: SuccessRate,
 }
 
 impl Statistic {
