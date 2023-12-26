@@ -2,10 +2,11 @@ use super::{basic::BasicShare, frames::Frames};
 use crate::Ic3;
 use logic_form::{Clause, Cube, Lit, Var};
 use minisat::{SatResult, Solver};
+use rand::{seq::SliceRandom, thread_rng};
 use std::{mem::take, ops::Deref, sync::Arc, time::Instant};
 
 pub struct Ic3Solver {
-    solver: Solver,
+    pub solver: Solver,
     num_act: usize,
     share: Arc<BasicShare>,
     frame: usize,
@@ -112,19 +113,23 @@ impl Ic3 {
         None
     }
 
-    fn blocked_inner(&mut self, frame: usize, cube: &Cube) -> BlockResult {
+    fn blocked_inner(&mut self, frame: usize, cube: &Cube, assume: &[Lit]) -> BlockResult {
         self.statistic.num_sat_inductive += 1;
         let solver_idx = frame - 1;
         let solver = &mut self.solvers[solver_idx].solver;
         let start = Instant::now();
         let mut assumption = self.share.model.cube_next(cube);
         let act = solver.new_var().into();
+        assumption.extend_from_slice(assume);
         assumption.push(act);
         let mut tmp_cls = !cube;
         tmp_cls.push(!act);
         solver.add_clause(&tmp_cls);
         let res = solver.solve(&assumption);
         let act = !assumption.pop().unwrap();
+        for _ in 0..assume.len() {
+            assumption.pop();
+        }
         let res = match res {
             SatResult::Sat(_) => BlockResult::No(BlockResultNo {
                 solver_idx,
@@ -145,11 +150,27 @@ impl Ic3 {
         assert!(!self.share.model.cube_subsume_init(cube));
         let solver = &mut self.solvers[frame - 1];
         solver.num_act += 1;
-        if solver.num_act > 1000 {
+        if self.enable_restart && solver.num_act > 1000 {
             self.statistic.num_solver_restart += 1;
             solver.reset(&self.frames)
         }
-        self.blocked_inner(frame, cube)
+        self.blocked_inner(frame, cube, &[])
+    }
+
+    pub fn blocked_with_assumption(
+        &mut self,
+        frame: usize,
+        cube: &Cube,
+        assumption: &[Lit],
+    ) -> BlockResult {
+        assert!(!self.share.model.cube_subsume_init(cube));
+        let solver = &mut self.solvers[frame - 1];
+        solver.num_act += 1;
+        if self.enable_restart && solver.num_act > 1000 {
+            self.statistic.num_solver_restart += 1;
+            solver.reset(&self.frames)
+        }
+        self.blocked_inner(frame, cube, assumption)
     }
 
     pub fn blocked_with_ordered(
@@ -221,6 +242,74 @@ impl Ic3 {
 
     pub fn unblocked_model_lit_value(&self, unblock: &BlockResultNo, lit: Lit) -> bool {
         unsafe { self.solvers[unblock.solver_idx].solver.get_model() }.lit_value(lit)
+    }
+}
+
+impl Ic3 {
+    pub fn test_conflict(
+        &mut self,
+        lemma: Cube,
+        frame: usize,
+        successor: Cube,
+        blocked: BlockResultYes,
+    ) -> Cube {
+        let mut ty = 0;
+        let mut conflict = self.blocked_conflict(&blocked);
+        let mut success = true;
+        let mut common = lemma.clone();
+        self.activity.sort_by_activity(&mut common, false);
+        self.enable_restart = false;
+        let mut acts = Vec::new();
+        // dbg!("begin");
+        loop {
+            ty += 1;
+            let act = self.solvers[frame].solver.new_var().lit();
+            let mut cls = !&conflict;
+            acts.push(act);
+            cls.push(!act);
+            self.solvers[frame].add_clause(&cls);
+            // for c in common.iter() {
+            //     self.solvers[frame].set_polarity(c.var(), Some(c.polarity()));
+            // }
+            if let BlockResult::No(unblock) =
+                self.blocked_with_assumption(frame + 1, &successor, &[act])
+            {
+                self.solvers[frame].solver.release_var(!act);
+                // for c in common.iter() {
+                //     self.solvers[frame].set_polarity(c.var(), None);
+                // }
+                if ty == 3 {
+                    success = false;
+                    break;
+                }
+                // dbg!(common.len());
+                common.retain(|l| self.unblocked_model_lit_value(&unblock, *l));
+                common.shuffle(&mut thread_rng());
+                if self.share.model.cube_subsume_init(&common) {
+                    success = false;
+                    break;
+                }
+                match self.blocked(frame, &common) {
+                    BlockResult::Yes(blocked) => conflict = self.blocked_conflict(&blocked),
+                    BlockResult::No(_) => {
+                        success = false;
+                        break;
+                    }
+                }
+            } else {
+                self.solvers[frame].solver.release_var(!act);
+                // for c in common.iter() {
+                //     self.solvers[frame].set_polarity(c.var(), None);
+                // }
+                break;
+            }
+        }
+        if ty > 0 {
+            // dbg!(success);
+            self.statistic.test_success.statistic(success);
+        }
+        self.enable_restart = true;
+        conflict
     }
 }
 

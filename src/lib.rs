@@ -35,6 +35,7 @@ pub struct Ic3 {
     pub obligations: ProofObligationQueue,
     pub lift: Lift,
     pub statistic: Statistic,
+    enable_restart: bool,
 }
 
 impl Ic3 {
@@ -60,11 +61,22 @@ impl Ic3 {
         (self.depth() + 1, cube)
     }
 
-    pub fn handle_blocked(&mut self, po: ProofObligation, blocked: BlockResultYes) {
-        let conflict = self.blocked_conflict(&blocked);
+    pub fn handle_blocked(&mut self, mut po: ProofObligation, blocked: BlockResultYes) {
+        // let conflict = self.blocked_conflict(&blocked);
+        let conflict = if let Some(successor) = &po.successor {
+            self.test_conflict(
+                (*po.lemma).clone(),
+                po.frame,
+                (**successor).clone(),
+                blocked,
+            )
+        } else {
+            self.blocked_conflict(&blocked)
+        };
         let (frame, core) = self.generalize(po.frame, conflict);
         self.statistic.average_po_cube_len += po.lemma.len();
-        self.add_obligation(ProofObligation::new(frame, po.lemma, po.depth));
+        po.frame = frame;
+        self.add_obligation(po);
         self.add_cube(frame - 1, core);
     }
 
@@ -78,7 +90,12 @@ impl Ic3 {
                 self.statistic();
             }
             if self.frames.trivial_contained(po.frame, &po.lemma) {
-                self.add_obligation(ProofObligation::new(po.frame + 1, po.lemma, po.depth));
+                self.add_obligation(ProofObligation::new(
+                    po.frame + 1,
+                    po.lemma,
+                    po.depth,
+                    po.successor,
+                ));
                 continue;
             }
             // if self.sat_contained(po.frame, &po.cube) {
@@ -94,6 +111,7 @@ impl Ic3 {
                         po.frame - 1,
                         Lemma::new(model),
                         po.depth + 1,
+                        Some(po.lemma.clone()),
                     ));
                     self.add_obligation(po);
                 }
@@ -141,6 +159,7 @@ impl Ic3 {
             statistic: Statistic::new(share.args.model.as_ref().unwrap()),
             share,
             obligations: ProofObligationQueue::new(),
+            enable_restart: true,
         };
         res.new_frame();
         for cube in res.share.model.inits() {
@@ -159,7 +178,12 @@ impl Ic3 {
                     return false;
                 }
                 if let Some(cex) = self.get_bad() {
-                    self.add_obligation(ProofObligation::new(self.depth(), Lemma::new(cex), 0));
+                    self.add_obligation(ProofObligation::new(
+                        self.depth(),
+                        Lemma::new(cex),
+                        0,
+                        None,
+                    ));
                 } else {
                     break;
                 }

@@ -15,14 +15,16 @@ pub struct ProofObligation {
     pub frame: usize,
     pub lemma: Lemma,
     pub depth: usize,
+    pub successor: Option<Lemma>,
 }
 
 impl ProofObligation {
-    pub fn new(frame: usize, lemma: Lemma, depth: usize) -> Self {
+    pub fn new(frame: usize, lemma: Lemma, depth: usize, successor: Option<Lemma>) -> Self {
         Self {
             frame,
             lemma,
             depth,
+            successor,
         }
     }
 }

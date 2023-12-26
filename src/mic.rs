@@ -38,7 +38,9 @@ impl Ic3 {
                             self.blocked_with_ordered(frame - 1, &model, false)
                         {
                             ctgs += 1;
-                            let conflict = self.blocked_conflict(&blocked);
+                            // let conflict = self.blocked_conflict(&blocked);
+                            let conflict =
+                                self.test_conflict(model, frame - 1, cube.clone(), blocked);
                             let mut i = frame;
                             while i <= self.depth() {
                                 if let BlockResult::No(_) = self.blocked(i, &conflict) {
