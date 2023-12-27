@@ -48,9 +48,9 @@ impl Ic3 {
             .push(Ic3Solver::new(self.share.clone(), self.solvers.len()));
     }
 
-    fn generalize(&mut self, frame: usize, cube: Cube) -> (usize, Cube) {
+    fn generalize(&mut self, frame: usize, origin_cube: &Cube, cube: Cube) -> (usize, Cube) {
         let level = if self.share.args.ctg { 1 } else { 0 };
-        let mut cube = self.mic(frame, cube, level);
+        let mut cube = self.mic(frame, origin_cube, cube, level);
         for i in frame + 1..=self.depth() {
             match self.blocked(i, &cube) {
                 BlockResult::Yes(block) => cube = self.blocked_conflict(&block),
@@ -62,7 +62,7 @@ impl Ic3 {
 
     pub fn handle_blocked(&mut self, po: ProofObligation, blocked: BlockResultYes) {
         let conflict = self.blocked_conflict(&blocked);
-        let (frame, core) = self.generalize(po.frame, conflict);
+        let (frame, core) = self.generalize(po.frame, &po.lemma, conflict);
         self.statistic.average_po_cube_len += po.lemma.len();
         self.add_obligation(ProofObligation::new(frame, po.lemma, po.depth));
         self.add_cube(frame - 1, core);

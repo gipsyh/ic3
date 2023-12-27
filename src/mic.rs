@@ -1,7 +1,7 @@
 use super::{solver::BlockResult, Ic3};
 use crate::solver::BlockResultNo;
 use logic_form::{Cube, Lit};
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Instant};
 
 #[derive(Debug)]
 enum DownResult {
@@ -47,7 +47,7 @@ impl Ic3 {
                                 }
                                 i += 1;
                             }
-                            let conflict = self.mic(i - 1, conflict, level - 1);
+                            let conflict = self.mic(i - 1, &model, conflict, level - 1);
                             self.add_cube(i - 1, conflict);
                             continue;
                         }
@@ -98,34 +98,37 @@ impl Ic3 {
         (new_cube, new_i)
     }
 
-    pub fn mic(&mut self, frame: usize, mut cube: Cube, level: usize) -> Cube {
+    pub fn mic(&mut self, frame: usize, origin_cube: &Cube, mut cube: Cube, level: usize) -> Cube {
         self.statistic.average_mic_cube_len += cube.len();
         self.statistic.num_mic += 1;
         if level > 0 {
             self.add_temporary_cube(frame, &cube);
         }
-        self.activity.sort_by_activity(&mut cube, true);
-        let mut keep = HashSet::new();
-        let mut i = 0;
-        while i < cube.len() {
-            if keep.contains(&cube[i]) {
-                i += 1;
-                continue;
-            }
-            let mut removed_cube = cube.clone();
-            removed_cube.remove(i);
-            match self.ctg_down(frame, &removed_cube, &keep, level) {
+        let mut ocube = cube.clone();
+        ocube.sort();
+        let s = Instant::now();
+        // let mut origin_cube = origin_cube.clone();
+        // origin_cube.sort();
+        let similars = self.frames.similar(&cube, frame);
+        self.statistic.test_time += s.elapsed();
+        // dbg!(&similars);
+        for similar in similars {
+            // dbg!(&similar);
+            let mut keep = HashSet::from_iter(similar.iter().copied());
+            match self.ctg_down(frame, &similar, &keep, level) {
                 DownResult::Success(new_cube) => {
-                    self.statistic.mic_drop.success();
-                    (cube, i) = self.handle_down_success(frame, cube, i, new_cube);
+                    self.statistic.test_a.success();
+                    // dbg!("success");
+                    cube = new_cube;
+                    break;
                 }
                 _ => {
-                    self.statistic.mic_drop.fail();
-                    keep.insert(cube[i]);
-                    i += 1;
+                    // dbg!("fail");
                 }
             }
+            self.statistic.test_a.fail();
         }
+        self.statistic.test.statistic(cube != ocube);
         self.activity.pump_cube_activity(&cube);
         cube
     }

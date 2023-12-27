@@ -106,6 +106,36 @@ impl Frames {
         self.early = self.frames.len() - 1
     }
 
+    pub fn similar(&self, cube: &Cube, frame: usize) -> Vec<Cube> {
+        let cube_set: HashSet<Lit> = HashSet::from_iter(cube.iter().copied());
+        let mut res = HashSet::new();
+        for frame in self.frames[frame..].iter() {
+            for lemma in frame.iter() {
+                let sec: Cube = lemma
+                    .iter()
+                    .filter(|l| cube_set.contains(l))
+                    .copied()
+                    .collect();
+                if sec.len() != cube.len() && sec.len() * 2 >= cube.len() {
+                    res.insert(sec);
+                }
+            }
+        }
+        let mut res = Vec::from_iter(res.into_iter());
+        res.sort_by(|x, y| {
+            if x.len() == y.len() {
+                x.cmp(y)
+            } else {
+                x.len().cmp(&y.len())
+            }
+        });
+        res.reverse();
+        if res.len() > 3 {
+            res.truncate(3);
+        }
+        res
+    }
+
     pub fn statistic(&self) {
         for frame in self.frames.iter() {
             print!("{} ", frame.len());
