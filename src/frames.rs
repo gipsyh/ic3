@@ -74,13 +74,13 @@ pub struct Frames {
 impl Frames {
     pub fn new() -> Self {
         Self {
-            frames: Vec::new(),
+            frames: vec![Vec::new()],
             early: 1,
         }
     }
 
     pub fn new_frame(&mut self) {
-        self.frames.push(Vec::new());
+        self.frames.insert(self.frames.len() - 1, Vec::new());
     }
 
     pub fn trivial_contained(&self, frame: usize, lemma: &Lemma) -> bool {
@@ -103,7 +103,7 @@ impl Frames {
     }
 
     pub fn reset_early(&mut self) {
-        self.early = self.frames.len() - 1
+        self.early = self.frames.len() - 2
     }
 
     pub fn statistic(&self) {
@@ -132,7 +132,7 @@ impl Ic3 {
     pub fn add_cube(&mut self, frame: usize, cube: Cube) {
         let lemma = Lemma::new(cube);
         if frame == 0 {
-            assert!(self.frames.len() == 1);
+            assert!(self.depth() == 0);
             self.solvers[0].add_clause(&!&lemma.cube);
             self.frames[0].push(lemma);
             return;

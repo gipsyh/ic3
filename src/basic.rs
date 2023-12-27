@@ -50,7 +50,7 @@ impl Ord for ProofObligation {
 
 #[derive(Default, Debug)]
 pub struct ProofObligationQueue {
-    obligations: BTreeSet<ProofObligation>,
+    pub obligations: BTreeSet<ProofObligation>,
     num: Vec<usize>,
 }
 
@@ -64,7 +64,11 @@ impl ProofObligationQueue {
             self.num.resize(po.frame + 1, 0);
         }
         self.num[po.frame] += 1;
-        assert!(self.obligations.insert(po.clone()));
+        if !self.obligations.insert(po.clone()) {
+            self.num[po.frame] -= 1;
+            // dbg!(po);
+            // panic!();
+        }
     }
 
     pub fn pop(&mut self, depth: usize) -> Option<ProofObligation> {

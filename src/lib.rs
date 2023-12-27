@@ -39,13 +39,15 @@ pub struct Ic3 {
 
 impl Ic3 {
     pub fn depth(&self) -> usize {
-        self.solvers.len() - 1
+        self.frames.len() - 2
     }
 
-    pub(crate) fn new_frame(&mut self) {
+    fn new_frame(&mut self) {
         self.frames.new_frame();
-        self.solvers
-            .push(Ic3Solver::new(self.share.clone(), self.solvers.len()));
+        self.solvers.insert(
+            self.solvers.len() - 1,
+            Ic3Solver::new(self.share.clone(), Some(self.depth())),
+        );
     }
 
     fn generalize(&mut self, frame: usize, cube: Cube) -> (usize, Cube) {
@@ -123,6 +125,27 @@ impl Ic3 {
                 return true;
             }
         }
+
+        let start = Instant::now();
+        self.frames.statistic();
+        let depth = self.depth();
+        self.frames[depth].sort_by_key(|x| x.len());
+        let frame = self.frames[depth].clone();
+        for cube in frame {
+            if !self.frames[depth].contains(&cube) {
+                continue;
+            }
+            match self.blocked(depth + 2, &cube) {
+                BlockResult::Yes(blocked) => {
+                    let conflict = self.blocked_conflict(&blocked);
+                    self.add_cube(depth + 1, conflict);
+                }
+                BlockResult::No(_) => {}
+            }
+        }
+        self.solvers[depth + 1].simplify();
+        self.statistic.test += start.elapsed();
+        self.frames.statistic();
         self.frames.reset_early();
         false
     }
@@ -134,7 +157,7 @@ impl Ic3 {
         let model = Model::from_aig(&aig, !args.backward);
         let share = Arc::new(BasicShare { args, model });
         let mut res = Self {
-            solvers: Vec::new(),
+            solvers: vec![Ic3Solver::new(share.clone(), None)],
             frames: Frames::new(),
             activity: Activity::new(),
             lift: Lift::new(share.clone()),

@@ -26,6 +26,8 @@ pub struct Statistic {
 
     pub overall_block_time: Duration,
     pub overall_propagate_time: Duration,
+
+    pub test: Duration,
 }
 
 impl Statistic {

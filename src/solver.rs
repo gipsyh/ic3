@@ -8,12 +8,12 @@ pub struct Ic3Solver {
     solver: Solver,
     num_act: usize,
     share: Arc<BasicShare>,
-    frame: usize,
+    frame: Option<usize>,
     temporary: Vec<Cube>,
 }
 
 impl Ic3Solver {
-    pub fn new(share: Arc<BasicShare>, frame: usize) -> Self {
+    pub fn new(share: Arc<BasicShare>, frame: Option<usize>) -> Self {
         let mut solver = Solver::new();
         if let Some(seed) = share.args.random {
             solver.set_random_seed(seed as f64);
@@ -38,10 +38,10 @@ impl Ic3Solver {
             self.solver.add_clause(&!&t);
             self.temporary.push(t);
         }
-        let frames_slice = if self.frame == 0 {
-            &frames[0..1]
-        } else {
-            &frames[self.frame..]
+        let frames_slice = match self.frame {
+            Some(0) => &frames[0..1],
+            Some(frame) => &frames[frame..],
+            None => &frames[frames.len() - 1..],
         };
         for dnf in frames_slice.iter() {
             for cube in dnf {
@@ -97,14 +97,10 @@ impl Ic3Solver {
 
 impl Ic3 {
     pub fn get_bad(&mut self) -> Option<Cube> {
-        if let SatResult::Sat(_) = self
-            .solvers
-            .last_mut()
-            .unwrap()
-            .solve(&self.share.model.bad)
-        {
+        let depth = self.depth();
+        if let SatResult::Sat(_) = self.solvers[depth].solve(&self.share.model.bad) {
             self.statistic.num_get_bad_state += 1;
-            let model = unsafe { self.solvers.last().unwrap().solver.get_model() };
+            let model = unsafe { self.solvers[depth].solver.get_model() };
             let bad = self.share.model.bad.clone();
             let cex = self.minimal_predecessor(&bad, model);
             return Some(cex);

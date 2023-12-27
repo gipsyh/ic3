@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 impl Ic3 {
     fn verify_invariant(&mut self, invariants: &[Lemma]) -> bool {
-        let mut solver = Ic3Solver::new(self.share.clone(), 1);
+        let mut solver = Ic3Solver::new(self.share.clone(), Some(1));
         for lemma in invariants {
             solver.add_clause(&!lemma.deref());
         }
