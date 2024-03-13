@@ -176,6 +176,7 @@ dependencies = [
  "logic-form",
  "rand",
  "satif",
+ "transys",
 ]
 
 [[package]]
@@ -361,6 +362,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "transys"
+version = "0.1.0"
+dependencies = [
+ "aig",
+ "logic-form",
+ "minisat",
+ "satif",
 ]
 
 [[package]]
